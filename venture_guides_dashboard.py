@@ -998,7 +998,7 @@ CRITICAL INSTRUCTIONS:
 - Always format SAE feature numbers as clickable links using markdown format with target="_blank":
   [10285](https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html#/model/gpt2-small/family/v5_32k/layer/8/location/resid_post_mlp/feature/10285)
 - Include SAE feature references naturally in your explanations
-- For multiple features, use commas AND SPACES to separate them and NEVER keep them in the same link!  That is wrong!
+- For multiple features, ONLY ONE FEATURE PER SENTENCE!  NO EXCEPTIONS!
 - Be helpful and focus on the data provided
 - Sound natural and knowledgeable, as if this is your own analysis"""},
                         {"role": "user", "content": f"Based on this data context:\n{context}\n\nUser question: {message}"}
