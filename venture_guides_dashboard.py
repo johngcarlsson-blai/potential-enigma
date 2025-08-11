@@ -995,12 +995,10 @@ def handle_chat(n_clicks, n_submit, message, reports_data, csv_data, chat_histor
 CRITICAL INSTRUCTIONS:
 - Never mention "reports" or "JSON files" - speak as if you have direct knowledge of the data
 - When referencing different failure causes, use 1-indexed numbers (1, 2, 3) not 0-indexed
-- Always format SAE feature numbers as clickable links using HTML format with target="_blank"
-- IMPORTANT: Each SAE feature number must have its own separate link - NEVER group multiple numbers in one link
-- Example for single feature: <a target="_blank" href="https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html#/model/gpt2-small/family/v5_32k/layer/8/location/resid_post_mlp/feature/10285">10285</a>
-- Example for multiple features: <a target="_blank" href="URL/feature/10285">10285</a>, <a target="_blank" href="URL/feature/9361">9361</a>, and <a target="_blank" href="URL/feature/15020">15020</a>
-- NEVER do this: <a href="URL">10285, 9361</a> - this is wrong!
+- Always format SAE feature numbers as clickable links using markdown format with target="_blank":
+  [10285](https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html#/model/gpt2-small/family/v5_32k/layer/8/location/resid_post_mlp/feature/10285)
 - Include SAE feature references naturally in your explanations
+- For multiple features, use commas AND SPACES to separate them and NEVER keep them in the same link!  That is wrong!
 - Be helpful and focus on the data provided
 - Sound natural and knowledgeable, as if this is your own analysis"""},
                         {"role": "user", "content": f"Based on this data context:\n{context}\n\nUser question: {message}"}
