@@ -13,9 +13,13 @@ import numpy as np
 from contextlib import redirect_stdout, redirect_stderr
 from network_graphs import EnhancedNetworkSwitcher, graphs
 import os
+import openai
 
 # Configure Plotly to not auto-display (prevents terminal HTML output)
 pio.renderers.default = None
+
+# Configure OpenAI (you'll need to set your API key as an environment variable)
+# Set OPENAI_API_KEY=your_key_here in your environment
 
 # --- Branding ---
 COMPANY_NAME = "BluelightAI"
@@ -46,6 +50,9 @@ app.layout = html.Div([
     
     # Pie Charts Section (Hidden initially)
     html.Div(id='pie-charts-section', children=[], style={'display': 'none'}),
+    
+    # Chat Section (Hidden initially, shown after data upload)
+    html.Div(id='chat-section', children=[], style={'display': 'none'}),
     
     # Data Grid Section (Hidden initially)
     html.Div(id='data-grid-section', children=[], style={'display': 'none'}),
@@ -93,7 +100,10 @@ app.layout = html.Div([
     dcc.Store(id='stored-data'),
     
     # Store for JSON reports
-    dcc.Store(id='stored-reports')
+    dcc.Store(id='stored-reports'),
+    
+    # Store for chat history
+    dcc.Store(id='chat-history', data=[])
     
 ], style={'fontFamily': 'Arial, sans-serif', 'margin': 0, 'padding': 0, 'backgroundColor': '#f7fafc', 'minHeight': '100vh'})
 
@@ -103,6 +113,8 @@ app.layout = html.Div([
      Output('stored-reports', 'data'),
      Output('pie-charts-section', 'children'),
      Output('pie-charts-section', 'style'),
+     Output('chat-section', 'children'),
+     Output('chat-section', 'style'),
      Output('data-grid-section', 'children'),
      Output('data-grid-section', 'style'),
      Output('upload-status', 'children'),
@@ -112,7 +124,7 @@ app.layout = html.Div([
 )
 def update_dashboard(contents, filenames):
     if contents is None:
-        return None, {}, [], {'display': 'none'}, [], {'display': 'none'}, [], {'margin': '20px', 'padding': '20px', 'backgroundColor': '#edf2f7', 'borderRadius': '10px', 'border': '1px solid #cbd5e0'}
+        return None, {}, [], {'display': 'none'}, [], {'display': 'none'}, [], {'display': 'none'}, [], {'margin': '20px', 'padding': '20px', 'backgroundColor': '#edf2f7', 'borderRadius': '10px', 'border': '1px solid #cbd5e0'}
     
     try:
         # Handle both single file and multiple files
@@ -152,6 +164,9 @@ def update_dashboard(contents, filenames):
         # Create pie charts (using JSON data if available)
         pie_charts = create_pie_charts(json_data)
         
+        # Create chat section
+        chat_section = create_chat_section()
+        
         # Create data grid
         data_grid = create_data_grid(df)
         
@@ -179,7 +194,7 @@ def update_dashboard(contents, filenames):
             'marginTop': '40px'
         }
         
-        return df.to_dict('records'), json_reports, pie_charts, {'display': 'block'}, data_grid, {'display': 'block'}, status_message, upload_style_bottom
+        return df.to_dict('records'), json_reports, pie_charts, {'display': 'block'}, chat_section, {'display': 'block'}, data_grid, {'display': 'block'}, status_message, upload_style_bottom
         
     except Exception as e:
         # Error status
@@ -189,7 +204,7 @@ def update_dashboard(contents, filenames):
         ], style={'color': '#e74c3c', 'fontWeight': 'bold', 'fontSize': '14px'})
         
         return None, {}, [html.Div(f"Error processing file: {str(e)}", 
-                              style={'color': 'red', 'textAlign': 'center'})], {'display': 'block'}, [], {'display': 'none'}, error_message, {'margin': '20px', 'padding': '20px', 'backgroundColor': '#edf2f7', 'borderRadius': '10px', 'border': '1px solid #cbd5e0'}
+                              style={'color': 'red', 'textAlign': 'center'})], {'display': 'block'}, [], {'display': 'none'}, [], {'display': 'none'}, error_message, {'margin': '20px', 'padding': '20px', 'backgroundColor': '#edf2f7', 'borderRadius': '10px', 'border': '1px solid #cbd5e0'}
 
 
 def create_pie_charts(json_data=None):
@@ -310,6 +325,77 @@ def create_pie_charts(json_data=None):
                     'fontSize': '2rem'
                 }),
         html.Div(tiles, style={'textAlign': 'center', 'marginBottom': '20px'})
+    ]
+
+def create_chat_section():
+    """Create chat interface for asking questions about the data"""
+    return [
+        html.Div([
+            html.H3("Ask Questions About Your Data", 
+                    style={
+                        'color': '#1a365d', 
+                        'textAlign': 'center', 
+                        'marginBottom': '20px', 
+                        'fontWeight': 'bold', 
+                        'fontSize': '1.8rem'
+                    }),
+            
+            # Chat messages area
+            html.Div(id='chat-messages', 
+                    children=[], 
+                    style={
+                        'minHeight': '300px',
+                        'maxHeight': '500px', 
+                        'overflowY': 'auto',
+                        'backgroundColor': '#ffffff',
+                        'border': '1px solid #e2e8f0',
+                        'borderRadius': '10px',
+                        'padding': '15px',
+                        'marginBottom': '15px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    }),
+            
+            # Chat input area
+            html.Div([
+                dcc.Input(
+                    id='chat-input',
+                    type='text',
+                    placeholder='Ask about the data... e.g. "What are the biggest causes of failure?"',
+                    autoComplete='off',
+                    style={
+                        'width': '80%',
+                        'padding': '12px',
+                        'border': '1px solid #cbd5e0',
+                        'borderRadius': '6px',
+                        'fontSize': '14px',
+                        'marginRight': '10px',
+                        'outline': 'none'
+                    }
+                ),
+                html.Button('Send', 
+                           id='chat-send',
+                           style={
+                               'width': '18%',
+                               'padding': '12px',
+                               'backgroundColor': '#2d5a87',
+                               'color': 'white',
+                               'border': 'none',
+                               'borderRadius': '6px',
+                               'cursor': 'pointer',
+                               'fontSize': '14px',
+                               'fontWeight': 'bold',
+                               'transition': 'all 0.3s ease'
+                           })
+            ], style={'display': 'flex', 'alignItems': 'center'})
+            
+        ], style={
+            'margin': '20px', 
+            'padding': '25px', 
+            'backgroundColor': '#f7fafc', 
+            'borderRadius': '12px', 
+            'border': '1px solid #e2e8f0',
+            'boxShadow': '0 4px 8px rgba(0,0,0,0.1)'
+        })
     ]
 
 def create_data_grid(df):
@@ -855,7 +941,102 @@ def close_report(n_clicks1, n_clicks2):
         return [], {'display': 'none'}
     return dash.no_update, dash.no_update
 
+# Chat callback to handle user questions (both button click and Enter key)
+@app.callback(
+    [Output('chat-messages', 'children'),
+     Output('chat-input', 'value'),
+     Output('chat-history', 'data')],
+    [Input('chat-send', 'n_clicks'),
+     Input('chat-input', 'n_submit')],
+    [State('chat-input', 'value'),
+     State('stored-reports', 'data'),
+     State('stored-data', 'data'),
+     State('chat-history', 'data')]
+)
+def handle_chat(n_clicks, n_submit, message, reports_data, csv_data, chat_history):
+    if (not n_clicks and not n_submit) or not message or not message.strip():
+        return chat_history if chat_history else [], '', chat_history if chat_history else []
+    
+    try:
+        # Create context from the data for the AI
+        context_parts = []
+        
+        # Send the complete JSON data for comprehensive analysis
+        if reports_data:
+            context_parts.append("COMPLETE DATA:")
+            for key, report in reports_data.items():
+                # Convert 0-indexed to 1-indexed for user-facing display
+                display_key = str(int(key) + 1)
+                context_parts.append(f"Analysis {display_key}: {report.get('title', 'Unknown')}")
+                context_parts.append(f"Full content: {report.get('content', '')}")
+                if 'correlated_sae_features' in report:
+                    context_parts.append(f"Correlated SAE features: {report.get('correlated_sae_features', [])}")
+        
+        if csv_data:
+            context_parts.append(f"CSV data contains {len(csv_data)} rows")
+            if csv_data:
+                columns = list(csv_data[0].keys()) if csv_data else []
+                context_parts.append(f"CSV columns: {columns}")
+        
+        context = "\n".join(context_parts)
+        
+        # Call OpenAI API (safely handle if no API key)
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            answer = "⚠️ OpenAI API key not configured. Please set OPENAI_API_KEY environment variable to enable AI responses. For now, I can tell you that your data contains the reports and CSV information shown above."
+        else:
+            try:
+                client = openai.OpenAI(api_key=api_key)
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": """You are an AI assistant analyzing SAE (Sparse Autoencoder) interpretability data. 
+
+CRITICAL INSTRUCTIONS:
+- Never mention "reports" or "JSON files" - speak as if you have direct knowledge of the data
+- When referencing different failure causes, use 1-indexed numbers (1, 2, 3) not 0-indexed
+- Always format SAE feature numbers as clickable links using markdown format with target="_blank":
+  [10285](https://openaipublic.blob.core.windows.net/sparse-autoencoder/sae-viewer/index.html#/model/gpt2-small/family/v5_32k/layer/8/location/resid_post_mlp/feature/10285)
+- Include SAE feature references naturally in your explanations
+- Be helpful and focus on the data provided
+- Sound natural and knowledgeable, as if this is your own analysis"""},
+                        {"role": "user", "content": f"Based on this data context:\n{context}\n\nUser question: {message}"}
+                    ],
+                    max_tokens=1500,
+                    temperature=0.7
+                )
+                answer = response.choices[0].message.content
+            except Exception as e:
+                answer = f"⚠️ Error calling OpenAI API: {str(e)}. Please check your API key and internet connection."
+        
+        # Add to chat history
+        new_chat_entry = [
+            html.Div([
+                html.Strong("You: ", style={'color': '#2d5a87'}),
+                html.Span(message, style={'color': '#2d3748'})
+            ], style={'marginBottom': '10px', 'padding': '10px', 'backgroundColor': '#edf2f7', 'borderRadius': '8px'}),
+            html.Div([
+                html.Strong("AI: ", style={'color': '#1a365d'}),
+                dcc.Markdown(answer, link_target="_blank", style={'color': '#2d3748', 'margin': '0'})
+            ], style={'marginBottom': '15px', 'padding': '10px', 'backgroundColor': '#ffffff', 'borderRadius': '8px', 'border': '1px solid #e2e8f0'})
+        ]
+        
+        updated_history = (chat_history if chat_history else []) + new_chat_entry
+        
+        return updated_history, '', updated_history
+        
+    except Exception as e:
+        error_message = [
+            html.Div([
+                html.Strong("Error: ", style={'color': '#e74c3c'}),
+                html.Span(f"Failed to process your question: {str(e)}", style={'color': '#2d3748'})
+            ], style={'marginBottom': '10px', 'padding': '10px', 'backgroundColor': '#fed7d7', 'borderRadius': '8px'})
+        ]
+        
+        updated_history = (chat_history if chat_history else []) + error_message
+        return updated_history, '', updated_history
+
 if __name__ == '__main__':
     if __name__ == '__main__':
-        app.run_server(host='0.0.0.0', port=int(os.environ.get('PORT', 8050)), debug=False)
-        #app.run(debug=True, port=8050)
+        #app.run_server(host='0.0.0.0', port=int(os.environ.get('PORT', 8050)), debug=False)
+        app.run(debug=True, port=8050)
